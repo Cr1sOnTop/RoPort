@@ -23,6 +23,12 @@ const openAddModalBtn = document.getElementById('openAddModalBtn');
 const modalBackdrop = document.getElementById('modalBackdrop');
 const modalCloseBtn = document.getElementById('modalCloseBtn');
 const modalCancelBtn = document.getElementById('modalCancelBtn');
+const gameInfoEl = document.getElementById('gameInfo');
+const infoModalBackdrop = document.getElementById('infoModalBackdrop');
+const infoModalCloseBtn = document.getElementById('infoModalCloseBtn');
+const infoModalCancelBtn = document.getElementById('infoModalCancelBtn');
+const infoRows = document.getElementById('infoRows');
+const infoCopyBtn = document.getElementById('infoCopyBtn');
 
 function esc(s){
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -45,6 +51,58 @@ function parse(raw){
   return {code, type, url:u};
 }
 
+// --- game name/icon lookup (via /api/resolve serverless function) ---
+// Only works once deployed (e.g. on Vercel) — the browser can't fetch
+// Roblox's pages directly due to CORS, so this needs a same-origin backend.
+// Fails silently (returns null) if the endpoint isn't there, e.g. when
+// previewed as a plain artifact/local file.
+async function resolveGameInfo(rawUrl){
+  try{
+    const resp = await fetch('/api/resolve?url=' + encodeURIComponent(rawUrl));
+    if(!resp.ok) return null;
+    const data = await resp.json();
+    if(data && data.gameName) return { gameName: data.gameName, gameImage: data.gameImage || null };
+    return null;
+  }catch(err){
+    return null;
+  }
+}
+
+let currentGameInfo = null;
+let convertLookupTimer = null;
+let convertLookupToken = 0;
+
+function hideGameInfo(){
+  clearTimeout(convertLookupTimer);
+  convertLookupToken++;
+  gameInfoEl.style.display = 'none';
+  gameInfoEl.textContent = '';
+  currentGameInfo = null;
+}
+
+function scheduleGameLookup(rawUrl){
+  clearTimeout(convertLookupTimer);
+  if(!/^https?:/i.test(rawUrl)){
+    hideGameInfo();
+    return;
+  }
+  convertLookupTimer = setTimeout(async ()=>{
+    const token = ++convertLookupToken;
+    gameInfoEl.style.display = 'block';
+    gameInfoEl.textContent = 'Looking up game…';
+    const info = await resolveGameInfo(rawUrl);
+    if(token !== convertLookupToken) return; // input changed since this lookup started
+    if(info){
+      currentGameInfo = info;
+      gameInfoEl.textContent = `Game: ${info.gameName}`;
+    }else{
+      currentGameInfo = null;
+      gameInfoEl.style.display = 'none';
+      gameInfoEl.textContent = '';
+    }
+  }, 500);
+}
+
 function render(){
   const raw = urlIn.value;
   const result = parse(raw);
@@ -60,6 +118,7 @@ function render(){
     saveServerBtn.disabled = true;
     openBtn.setAttribute('aria-disabled','true');
     openBtn.removeAttribute('href');
+    hideGameInfo();
     return;
   }
 
@@ -71,6 +130,7 @@ function render(){
     saveServerBtn.disabled = true;
     openBtn.setAttribute('aria-disabled','true');
     openBtn.removeAttribute('href');
+    hideGameInfo();
     return;
   }
 
@@ -96,6 +156,7 @@ function render(){
     saveServerBtn.disabled = true;
     openBtn.setAttribute('aria-disabled','true');
     openBtn.removeAttribute('href');
+    hideGameInfo();
     return;
   }
 
@@ -111,6 +172,7 @@ function render(){
   openBtn.setAttribute('href', deepLink);
   copyBtn.dataset.link = deepLink;
   saveServerBtn.dataset.link = deepLink;
+  scheduleGameLookup(raw.trim());
 }
 
 urlIn.addEventListener('input', render);
@@ -174,12 +236,15 @@ saveServerBtn.addEventListener('click', ()=>{
 });
 
 // --- add-server modal ---
+let pendingGameInfo = null;
+
 function openAddModal(prefillLink){
   srvName.value = '';
   srvOwner.value = '';
   srvLink.value = prefillLink || '';
+  pendingGameInfo = prefillLink ? currentGameInfo : null;
   modalBackdrop.classList.add('open');
-  (prefillLink ? srvName : srvName).focus();
+  srvName.focus();
 }
 function closeAddModal(){
   modalBackdrop.classList.remove('open');
@@ -190,8 +255,43 @@ modalCancelBtn.addEventListener('click', closeAddModal);
 modalBackdrop.addEventListener('click', (e)=>{
   if(e.target === modalBackdrop) closeAddModal();
 });
+
+// --- server-info modal ---
+let infoModalLink = null;
+
+function openInfoModal(s){
+  infoModalLink = s.link;
+  infoRows.innerHTML = `
+    <div class="info-row"><label>Server name</label><div class="value">${esc(s.name || 'Unnamed server')}</div></div>
+    <div class="info-row"><label>Game</label><div class="value">${esc(s.gameName || 'Unknown')}</div></div>
+    <div class="info-row"><label>Owner</label><div class="value">${esc(s.owner || '—')}</div></div>
+    <div class="info-row"><label>Link</label><div class="value">${esc(s.link)}</div></div>
+  `;
+  infoModalBackdrop.classList.add('open');
+}
+function closeInfoModal(){
+  infoModalBackdrop.classList.remove('open');
+}
+infoModalCloseBtn.addEventListener('click', closeInfoModal);
+infoModalCancelBtn.addEventListener('click', closeInfoModal);
+infoModalBackdrop.addEventListener('click', (e)=>{
+  if(e.target === infoModalBackdrop) closeInfoModal();
+});
+infoCopyBtn.addEventListener('click', async ()=>{
+  if(!infoModalLink) return;
+  try{
+    await navigator.clipboard.writeText(infoModalLink);
+    const original = infoCopyBtn.textContent;
+    infoCopyBtn.textContent = 'Copied ✓';
+    setTimeout(()=>{ infoCopyBtn.textContent = original; }, 1400);
+  }catch(err){ /* ignore */ }
+});
+
 document.addEventListener('keydown', (e)=>{
-  if(e.key === 'Escape' && modalBackdrop.classList.contains('open')) closeAddModal();
+  if(e.key === 'Escape'){
+    if(modalBackdrop.classList.contains('open')) closeAddModal();
+    if(infoModalBackdrop.classList.contains('open')) closeInfoModal();
+  }
 });
 
 document.addEventListener('click', (e)=>{
@@ -302,20 +402,28 @@ function renderServerList(){
     return;
   }
   if(storageAvailable) srvStatus.textContent = `${servers.length} saved`;
-  serverList.innerHTML = servers.map((s, i)=>`
+  serverList.innerHTML = servers.map((s, i)=>{
+    const iconHtml = s.gameImage
+      ? `<img class="server-icon" src="${esc(s.gameImage)}" alt="" loading="lazy">`
+      : `<div class="server-icon server-icon-placeholder">?</div>`;
+    return `
     <div class="server-card">
-      <div class="server-top">
-        <span class="server-name">${esc(s.name || 'Unnamed server')}</span>
-        ${s.owner ? `<span class="server-owner">${esc(s.owner)}</span>` : ''}
+      <div class="server-card-top">
+        <div class="server-card-info">
+          <div class="server-name">${esc(s.name || 'Unnamed server')}</div>
+          ${s.owner ? `<div class="server-owner">${esc(s.owner)}</div>` : ''}
+        </div>
+        ${iconHtml}
       </div>
-      <div class="server-link">${esc(s.link)}</div>
       <div class="server-actions">
         <button type="button" data-act="copy" data-i="${i}">Copy</button>
         <a class="btn" href="${esc(s.link)}" target="_top" rel="noopener" data-act="open" data-i="${i}">Open ↗</a>
+        <button type="button" class="btn-icon" data-act="info" data-i="${i}" aria-label="Server info">i</button>
         <button type="button" class="btn-danger" data-act="del" data-i="${i}">Delete</button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 serverList.addEventListener('click', async (e)=>{
@@ -347,9 +455,13 @@ serverList.addEventListener('click', async (e)=>{
     servers.splice(i, 1);
     persistServers();
   }
+
+  if(btn.dataset.act === 'info'){
+    openInfoModal(s);
+  }
 });
 
-srvAddBtn.addEventListener('click', ()=>{
+srvAddBtn.addEventListener('click', async ()=>{
   const name = srvName.value.trim();
   const owner = srvOwner.value.trim();
   const linkRaw = srvLink.value.trim();
@@ -357,8 +469,27 @@ srvAddBtn.addEventListener('click', ()=>{
     srvLink.focus();
     return;
   }
+
   const link = toDeepLinkIfPossible(linkRaw);
-  servers.unshift({ name, owner, link });
+
+  let gameInfo = pendingGameInfo;
+  if(!gameInfo && /^https?:/i.test(linkRaw)){
+    const original = srvAddBtn.textContent;
+    srvAddBtn.disabled = true;
+    srvAddBtn.textContent = 'Adding…';
+    gameInfo = await resolveGameInfo(linkRaw);
+    srvAddBtn.disabled = false;
+    srvAddBtn.textContent = original;
+  }
+
+  servers.unshift({
+    name,
+    owner,
+    link,
+    gameName: gameInfo ? gameInfo.gameName : null,
+    gameImage: gameInfo ? gameInfo.gameImage : null,
+  });
+  pendingGameInfo = null;
   srvName.value = '';
   srvOwner.value = '';
   srvLink.value = '';
