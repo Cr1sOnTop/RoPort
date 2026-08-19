@@ -9,6 +9,11 @@
 //   2. reads the start_place_id meta tag
 //   3. resolves place -> universe -> game name + icon via Roblox's public,
 //      unauthenticated game APIs
+//
+// Written as CommonJS (module.exports) rather than `export default` —
+// with no package.json declaring "type": "module" in this project, Vercel
+// treats plain .js files as CommonJS by default, so ESM export syntax here
+// would fail to load at all.
 
 const ALLOWED_HOSTS = new Set(['www.roblox.com', 'roblox.com', 'ro.blox.com']);
 
@@ -24,7 +29,7 @@ function extractMetaContent(html, property) {
 
 const UA = { 'User-Agent': 'Mozilla/5.0 (compatible; RoPortResolver/1.0)' };
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   const { url } = req.query;
   if (!url || typeof url !== 'string') {
     return res.status(400).json({ error: 'missing url param' });
@@ -99,4 +104,4 @@ export default async function handler(req, res) {
   } catch (err) {
     return res.status(502).json({ error: 'fetch failed' });
   }
-}
+};
