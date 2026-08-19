@@ -12,7 +12,6 @@ A small utility that converts Roblox web share links (`roblox.com/share?code=...
 - **URL anatomy breakdown** — a color-coded view of the host, path, and `code`/`type` params so you can see exactly what's being extracted.
 - **Copy / Open buttons** — one tap to copy the converted link, or to open it directly in the Roblox app.
 - **Saved servers tab** — save private servers with a name, owner, and link for quick access later (accepts either link format — it auto-converts on save). Copy, open, or delete each entry.
-- **Persistence** — saved servers stick around across visits via `localStorage`, saved per-browser.
 
 ## Why?
 
