@@ -140,15 +140,27 @@ pasteBtn.addEventListener('click', async (e)=>{
 });
 
 // --- tabs ---
-function showTab(which){
+const TAB_KEY = 'roport:active-tab';
+
+function showTab(which, skipSave){
   const onConvert = which === 'convert';
   tabConvertBtn.classList.toggle('active', onConvert);
   tabServersBtn.classList.toggle('active', !onConvert);
   viewConvert.classList.toggle('active', onConvert);
   viewServers.classList.toggle('active', !onConvert);
+  if(!skipSave){
+    try{ localStorage.setItem(TAB_KEY, which); }catch(err){ /* ignore */ }
+  }
 }
 tabConvertBtn.addEventListener('click', ()=>showTab('convert'));
 tabServersBtn.addEventListener('click', ()=>showTab('servers'));
+
+// Restore last-open tab on load
+(function restoreTab(){
+  let saved = null;
+  try{ saved = localStorage.getItem(TAB_KEY); }catch(err){ /* ignore */ }
+  if(saved === 'servers') showTab('servers', true);
+})();
 
 saveServerBtn.addEventListener('click', ()=>{
   const link = saveServerBtn.dataset.link;
