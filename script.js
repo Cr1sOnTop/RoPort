@@ -419,15 +419,9 @@ function renderServerList(){
   <button type="button" data-act="copy" data-i="${i}">Copy</button>
   <a class="btn" href="${esc(s.link)}" target="_top" rel="noopener" data-act="open" data-i="${i}">Open ↗</a>
   <button type="button" class="btn-danger" data-act="del" data-i="${i}">Delete</button>
+  <button type="button" class="btn-icon server-info-btn" data-act="info" data-i="${i}" aria-label="Server info">i</button>
 </div>
 
-<button
-  type="button"
-  class="btn-icon server-info-btn"
-  data-act="info"
-  data-i="${i}"
-  aria-label="Server info"
->i</button>
     </div>
   `;
   }).join('');
