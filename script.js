@@ -365,7 +365,93 @@ async function loadServers(){
   }else{
     srvStatus.textContent = 'session only (no persistence)';
   }
-  renderServerList();
+    renderServerList();
+  refreshSavedServerInfo();
+}
+
+function getResolverUrlFromSavedLink(link){
+  if(!link || typeof link !== 'string') return null;
+
+  try{
+    const u = new URL(link);
+
+    // Saved servers normally contain the Roblox deep link.
+    // Convert it back to a public Share URL for /api/resolve.
+    if(
+      u.protocol === 'roblox:' &&
+      u.searchParams.get('code') &&
+      u.searchParams.get('type')
+    ){
+      return 'https://www.roblox.com/share?code=' +
+        encodeURIComponent(u.searchParams.get('code')) +
+        '&type=' +
+        encodeURIComponent(u.searchParams.get('type'));
+    }
+
+    // Also support saved HTTPS Roblox links.
+    if(
+      u.protocol === 'https:' &&
+      (
+        u.hostname === 'www.roblox.com' ||
+        u.hostname === 'roblox.com' ||
+        u.hostname === 'ro.blox.com'
+      )
+    ){
+      return u.toString();
+    }
+  }catch(err){
+    // Ignore malformed saved links.
+  }
+
+  return null;
+}
+
+async function refreshSavedServerInfo(){
+  if(!servers.length) return;
+
+  let changed = false;
+
+  // Refresh one at a time so lots of saved servers don't
+  // hammer the resolver simultaneously.
+  for(const server of servers){
+    const resolverUrl =
+      getResolverUrlFromSavedLink(server.link);
+
+    if(!resolverUrl) continue;
+
+    try{
+      const info =
+        await resolveGameInfo(resolverUrl);
+
+      if(!info) continue;
+
+      if(
+        info.gameName &&
+        info.gameName !== server.gameName
+      ){
+        server.gameName = info.gameName;
+        changed = true;
+      }
+
+      if(
+        info.gameImage &&
+        info.gameImage !== server.gameImage
+      ){
+        server.gameImage = info.gameImage;
+        changed = true;
+      }
+
+    }catch(err){
+      console.warn(
+        '[RoPort] Saved server metadata refresh failed:',
+        err
+      );
+    }
+  }
+
+  if(changed){
+    await persistServers();
+  }
 }
 
 async function persistServers(){
