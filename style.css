@@ -344,6 +344,47 @@ footer{
   padding:18px 0;
 }
 
+/* --- add-server modal --- */
+.modal-backdrop{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(20,26,34,.45);
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  z-index:50;
+}
+.modal-backdrop.open{ display:flex; }
+.modal-panel{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:14px;
+  box-shadow:0 20px 50px -20px rgba(10,14,20,.5);
+  padding:22px;
+  width:100%;
+  max-width:420px;
+  animation:modalIn .15s ease;
+}
+@keyframes modalIn{
+  from{ opacity:0; transform:translateY(6px) scale(.98); }
+  to{ opacity:1; transform:none; }
+}
+.modal-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:16px;
+}
+.modal-close{
+  padding:6px;
+  border-radius:50%;
+  border:none;
+  background:var(--bg);
+  color:var(--ink-soft);
+}
+.modal-close:hover{ color:var(--ink); }
+
 @media (prefers-reduced-motion: reduce){
   *{ transition:none !important; }
 }

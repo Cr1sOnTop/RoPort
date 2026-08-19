@@ -19,6 +19,10 @@ const srvLink = document.getElementById('srvLink');
 const srvAddBtn = document.getElementById('srvAddBtn');
 const serverList = document.getElementById('serverList');
 const srvStatus = document.getElementById('srvStatus');
+const openAddModalBtn = document.getElementById('openAddModalBtn');
+const modalBackdrop = document.getElementById('modalBackdrop');
+const modalCloseBtn = document.getElementById('modalCloseBtn');
+const modalCancelBtn = document.getElementById('modalCancelBtn');
 
 function esc(s){
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -165,9 +169,29 @@ tabServersBtn.addEventListener('click', ()=>showTab('servers'));
 saveServerBtn.addEventListener('click', ()=>{
   const link = saveServerBtn.dataset.link;
   if(!link) return;
-  srvLink.value = link;
   showTab('servers');
-  srvName.focus();
+  openAddModal(link);
+});
+
+// --- add-server modal ---
+function openAddModal(prefillLink){
+  srvName.value = '';
+  srvOwner.value = '';
+  srvLink.value = prefillLink || '';
+  modalBackdrop.classList.add('open');
+  (prefillLink ? srvName : srvName).focus();
+}
+function closeAddModal(){
+  modalBackdrop.classList.remove('open');
+}
+openAddModalBtn.addEventListener('click', ()=>openAddModal());
+modalCloseBtn.addEventListener('click', closeAddModal);
+modalCancelBtn.addEventListener('click', closeAddModal);
+modalBackdrop.addEventListener('click', (e)=>{
+  if(e.target === modalBackdrop) closeAddModal();
+});
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape' && modalBackdrop.classList.contains('open')) closeAddModal();
 });
 
 document.addEventListener('click', (e)=>{
@@ -339,6 +363,7 @@ srvAddBtn.addEventListener('click', ()=>{
   srvOwner.value = '';
   srvLink.value = '';
   persistServers();
+  closeAddModal();
 });
 
 loadServers();
